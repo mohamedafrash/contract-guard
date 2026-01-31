@@ -8,10 +8,18 @@ const EmailDraft: React.FC<EmailDraftProps> = ({ emailBody }) => {
   const [copied, setCopied] = useState(false);
   const normalizedEmailBody = emailBody.replace(/\\n/g, "\n");
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(normalizedEmailBody);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopy = async () => {
+    try {
+      if (!navigator.clipboard) {
+        throw new Error('Clipboard API not available');
+      }
+      await navigator.clipboard.writeText(normalizedEmailBody);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      console.error('Failed to copy to clipboard:', error);
+      alert('Failed to copy to clipboard. Please select and copy manually.');
+    }
   };
 
   if (!emailBody) return null;

@@ -20,7 +20,7 @@ export interface ChecklistItem {
   description: string;
   status: ComplianceStatus;
   notes: string;
-  pageReference?: number;
+  pageReference: number | null;
 }
 
 export interface AnalysisResult {

@@ -8,6 +8,13 @@ const openai = createOpenAI({
   baseURL: process.env.AI_GATEWAY_BASE_URL || "https://ai-gateway.vercel.sh/v1",
 });
 
+const requestSchema = z.object({
+  files: z.array(z.object({
+    base64: z.string(),
+    type: z.string(),
+  })).min(1, "At least one file is required"),
+});
+
 const analysisSchema = z.object({
   summary: z.object({
     propertyAddress: z.string().describe("Full property address found in the contract."),
@@ -35,7 +42,17 @@ const analysisSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    const { files } = await request.json();
+    const body = await request.json();
+    const parseResult = requestSchema.safeParse(body);
+    
+    if (!parseResult.success) {
+      return NextResponse.json(
+        { error: parseResult.error.issues[0]?.message || "Invalid request body" },
+        { status: 400 }
+      );
+    }
+    
+    const { files } = parseResult.data;
 
     const prompt = `
       You are an expert Real Estate Compliance Auditor. 
@@ -84,6 +101,13 @@ export async function POST(request: NextRequest) {
         schema: analysisSchema,
       }),
     });
+
+    if (!result.output) {
+      return NextResponse.json(
+        { error: "Failed to parse AI response" },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json(result.output);
   } catch (error) {

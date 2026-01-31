@@ -77,7 +77,7 @@ const Checklist: React.FC<ChecklistProps> = ({ analysis }) => {
                   {item.notes}
                 </div>
 
-                {item.pageReference && (
+                {item.pageReference !== null && (
                   <div className="mt-1 flex items-center">
                     <span className="text-[10px] text-blue-600 font-medium bg-blue-50 px-1.5 py-0.5 rounded cursor-help" title="Page reference found by AI">
                         Page ref: {item.pageReference}

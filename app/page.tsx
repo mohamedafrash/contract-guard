@@ -6,7 +6,7 @@ import TransactionCard from './components/TransactionCard';
 import Checklist from './components/Checklist';
 import EmailDraft from './components/EmailDraft';
 import { UploadedFile, AnalysisResult } from './types';
-import { analyzeDocuments } from './services/geminiService';
+import { analyzeDocuments } from './services/analysisService';
 import Image from 'next/image';
 
 export default function Home() {

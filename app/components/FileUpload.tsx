@@ -9,6 +9,9 @@ interface FileUploadProps {
   isProcessing: boolean;
 }
 
+const MAX_FILE_SIZE_MB = 10;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
 const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected, files, onRemoveFile, isProcessing }) => {
   const handleFileChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
@@ -21,18 +24,28 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected, files, onRemov
           continue;
         }
 
-        const base64 = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.readAsDataURL(file);
-        });
+        if (file.size > MAX_FILE_SIZE_BYTES) {
+          alert(`File "${file.name}" exceeds the ${MAX_FILE_SIZE_MB}MB size limit.`);
+          continue;
+        }
 
-        newFiles.push({
-          name: file.name,
-          type: file.type,
-          size: file.size,
-          base64: base64,
-        });
+        try {
+          const base64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = () => reject(new Error(`Failed to read file: ${file.name}`));
+            reader.readAsDataURL(file);
+          });
+
+          newFiles.push({
+            name: file.name,
+            type: file.type,
+            size: file.size,
+            base64: base64,
+          });
+        } catch (error) {
+          alert(error instanceof Error ? error.message : 'Failed to read file');
+        }
       }
       onFilesSelected(newFiles);
     }
@@ -65,7 +78,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected, files, onRemov
             <h3 className="text-sm font-medium text-gray-700 mb-3">Selected Documents ({files.length})</h3>
             <div className="grid grid-cols-1 gap-3">
               {files.map((file, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-blue-50 border border-blue-100 rounded-md">
+                <div key={`${file.name}-${file.size}`} className="flex items-center justify-between p-3 bg-blue-50 border border-blue-100 rounded-md">
                   <div className="flex items-center space-x-3">
                     <FileIcon />
                     <div>
