@@ -1,6 +1,7 @@
 import { generateText, Output } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { z } from "zod";
+import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 
 const openai = createOpenAI({
@@ -9,15 +10,21 @@ const openai = createOpenAI({
 });
 
 const requestSchema = z.object({
-  files: z.array(z.object({
-    base64: z.string(),
-    type: z.string(),
-  })).min(1, "At least one file is required"),
+  files: z
+    .array(
+      z.object({
+        base64: z.string(),
+        type: z.string(),
+      }),
+    )
+    .min(1, "At least one file is required"),
 });
 
 const analysisSchema = z.object({
   summary: z.object({
-    propertyAddress: z.string().describe("Full property address found in the contract."),
+    propertyAddress: z
+      .string()
+      .describe("Full property address found in the contract."),
     buyerName: z.string().describe("Name(s) of the buyer(s)."),
     sellerName: z.string().describe("Name(s) of the seller(s)."),
     purchasePrice: z.string().describe("Purchase price amount."),
@@ -30,28 +37,44 @@ const analysisSchema = z.object({
       ruleName: z.string(),
       description: z.string().describe("Details for the compliance rule."),
       status: z.enum(["PRESENT", "MISSING", "UNCLEAR", "NOT_APPLICABLE"]),
-      notes: z.string().describe("Explanation of findings or why item is missing/unclear."),
+      notes: z
+        .string()
+        .describe("Explanation of findings or why item is missing/unclear."),
       pageReference: z
         .number()
         .nullable()
-        .describe("The page number where evidence was found, or null if not applicable."),
-    })
+        .describe(
+          "The page number where evidence was found, or null if not applicable.",
+        ),
+    }),
   ),
-  missingItemsEmailDraft: z.string().describe("A professional email draft to the other agent listing all missing or unclear items requiring attention."),
+  missingItemsEmailDraft: z
+    .string()
+    .describe(
+      "A professional email draft to the other agent listing all missing or unclear items requiring attention.",
+    ),
 });
 
 export async function POST(request: NextRequest) {
   try {
+    const { userId } = await auth();
+
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await request.json();
     const parseResult = requestSchema.safeParse(body);
-    
+
     if (!parseResult.success) {
       return NextResponse.json(
-        { error: parseResult.error.issues[0]?.message || "Invalid request body" },
-        { status: 400 }
+        {
+          error: parseResult.error.issues[0]?.message || "Invalid request body",
+        },
+        { status: 400 },
       );
     }
-    
+
     const { files } = parseResult.data;
 
     const prompt = `
@@ -76,9 +99,10 @@ export async function POST(request: NextRequest) {
       Return the output strictly in JSON format matching the provided schema.
     `;
 
-    const content: Array<{ type: "text"; text: string } | { type: "file"; data: string; mediaType: string }> = [
-      { type: "text", text: prompt },
-    ];
+    const content: Array<
+      | { type: "text"; text: string }
+      | { type: "file"; data: string; mediaType: string }
+    > = [{ type: "text", text: prompt }];
 
     files.forEach((file: { base64: string; type: string }) => {
       const cleanBase64 = file.base64.split(",")[1] || file.base64;
@@ -105,15 +129,14 @@ export async function POST(request: NextRequest) {
     if (!result.output) {
       return NextResponse.json(
         { error: "Failed to parse AI response" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
     return NextResponse.json(result.output);
   } catch (error) {
     console.error("Analysis failed:", error);
-    const message =
-      error instanceof Error ? error.message : "Analysis failed";
+    const message = error instanceof Error ? error.message : "Analysis failed";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
