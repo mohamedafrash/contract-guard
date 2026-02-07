@@ -9,6 +9,11 @@ const openai = createOpenAI({
   baseURL: process.env.AI_GATEWAY_BASE_URL || "https://ai-gateway.vercel.sh/v1",
 });
 
+const ALLOWED_MIME_TYPES = new Set(["application/pdf"]);
+const MAX_FILES = 5;
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
+const MAX_TOTAL_BYTES = 25 * 1024 * 1024;
+
 const requestSchema = z.object({
   files: z
     .array(
@@ -17,6 +22,7 @@ const requestSchema = z.object({
         type: z.string(),
       }),
     )
+    .max(MAX_FILES, `A maximum of ${MAX_FILES} files is allowed`)
     .min(1, "At least one file is required"),
 });
 
@@ -55,6 +61,33 @@ const analysisSchema = z.object({
     ),
 });
 
+function extractBase64Payload(value: string) {
+  const payload = value.trim();
+  const commaIndex = payload.indexOf(",");
+
+  if (!payload.startsWith("data:") || commaIndex === -1) {
+    return { detectedMimeType: null as string | null, base64Payload: payload };
+  }
+
+  const meta = payload.slice(5, commaIndex);
+  const detectedMimeType = meta.split(";")[0] || null;
+  const base64Payload = payload.slice(commaIndex + 1);
+
+  return { detectedMimeType, base64Payload };
+}
+
+function getDecodedSizeInBytes(base64: string) {
+  const normalized = base64.replace(/\s/g, "");
+  const validBase64 = /^[A-Za-z0-9+/]+={0,2}$/.test(normalized);
+
+  if (!validBase64 || normalized.length === 0 || normalized.length % 4 !== 0) {
+    return null;
+  }
+
+  const padding = normalized.endsWith("==") ? 2 : normalized.endsWith("=") ? 1 : 0;
+  return (normalized.length * 3) / 4 - padding;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { userId } = await auth();
@@ -76,6 +109,48 @@ export async function POST(request: NextRequest) {
     }
 
     const { files } = parseResult.data;
+    let totalSize = 0;
+
+    for (const file of files) {
+      if (!ALLOWED_MIME_TYPES.has(file.type)) {
+        return NextResponse.json(
+          { error: `Unsupported file type: ${file.type}` },
+          { status: 400 },
+        );
+      }
+
+      const { detectedMimeType, base64Payload } = extractBase64Payload(file.base64);
+
+      if (detectedMimeType && detectedMimeType !== file.type) {
+        return NextResponse.json(
+          { error: `File MIME type mismatch: expected ${file.type}, got ${detectedMimeType}` },
+          { status: 400 },
+        );
+      }
+
+      const fileSize = getDecodedSizeInBytes(base64Payload);
+      if (fileSize === null) {
+        return NextResponse.json(
+          { error: "One or more files contain invalid base64 data" },
+          { status: 400 },
+        );
+      }
+
+      if (fileSize > MAX_FILE_BYTES) {
+        return NextResponse.json(
+          { error: `Each file must be ${MAX_FILE_BYTES / 1024 / 1024}MB or smaller` },
+          { status: 413 },
+        );
+      }
+
+      totalSize += fileSize;
+      if (totalSize > MAX_TOTAL_BYTES) {
+        return NextResponse.json(
+          { error: `Total upload size must be ${MAX_TOTAL_BYTES / 1024 / 1024}MB or smaller` },
+          { status: 413 },
+        );
+      }
+    }
 
     const prompt = `
       You are an expert Real Estate Compliance Auditor. 
@@ -105,7 +180,7 @@ export async function POST(request: NextRequest) {
     > = [{ type: "text", text: prompt }];
 
     files.forEach((file: { base64: string; type: string }) => {
-      const cleanBase64 = file.base64.split(",")[1] || file.base64;
+      const cleanBase64 = extractBase64Payload(file.base64).base64Payload;
       content.push({
         type: "file",
         data: `data:${file.type};base64,${cleanBase64}`,

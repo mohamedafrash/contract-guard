@@ -9,7 +9,7 @@ import {
   Shield,
   CheckCircle,
 } from "lucide-react";
-import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/nextjs";
+import { SignedIn, UserButton } from "@clerk/nextjs";
 import FileUpload from "./components/FileUpload";
 import TransactionCard from "./components/TransactionCard";
 import Checklist from "./components/Checklist";
@@ -56,7 +56,9 @@ export default function Home() {
     } catch (err) {
       console.error(err);
       setError(
-        "Failed to analyze documents. Please check your API key and try again.",
+        err instanceof Error
+          ? err.message
+          : "Failed to analyze documents. Please try again.",
       );
     } finally {
       setIsAnalyzing(false);
@@ -73,6 +75,8 @@ export default function Home() {
     result?.checklist.filter((i) => i.status === "PRESENT").length ?? 0;
   const totalCount =
     result?.checklist.filter((i) => i.status !== "NOT_APPLICABLE").length ?? 0;
+  const scorePercent =
+    totalCount > 0 ? Math.round((passedCount / totalCount) * 100) : 0;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -111,13 +115,6 @@ export default function Home() {
               )}
             </AnimatePresence>
             <ThemeToggle />
-            <SignedOut>
-              <SignInButton mode="modal">
-                <button className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm">
-                  Sign In
-                </button>
-              </SignInButton>
-            </SignedOut>
             <SignedIn>
               <UserButton
                 appearance={{
@@ -308,7 +305,7 @@ export default function Home() {
                         Compliance Score
                       </h3>
                       <span className="text-2xl font-bold text-primary">
-                        {Math.round((passedCount / totalCount) * 100)}%
+                        {totalCount > 0 ? `${scorePercent}%` : "N/A"}
                       </span>
                     </div>
                     <div className="w-full bg-secondary rounded-full h-2.5 mb-2">
@@ -316,13 +313,15 @@ export default function Home() {
                         className="bg-primary h-2.5 rounded-full"
                         initial={{ width: 0 }}
                         animate={{
-                          width: `${(passedCount / totalCount) * 100}%`,
+                          width: `${scorePercent}%`,
                         }}
                         transition={{ duration: 1, delay: 0.5 }}
                       />
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      {passedCount} of {totalCount} requirements passed
+                      {totalCount > 0
+                        ? `${passedCount} of ${totalCount} requirements passed`
+                        : "No applicable requirements"}
                     </p>
                   </div>
                 </FadeIn>

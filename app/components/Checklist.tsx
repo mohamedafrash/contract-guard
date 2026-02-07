@@ -61,32 +61,37 @@ export default function Checklist({ analysis }: ChecklistProps) {
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [activeFilter, setActiveFilter] = useState<FilterType>('ALL');
 
-  const toggleExpand = (id: string) => {
+  const toggleExpand = (rowKey: string) => {
     setExpandedItems(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(id)) {
-        newSet.delete(id);
+      if (newSet.has(rowKey)) {
+        newSet.delete(rowKey);
       } else {
-        newSet.add(id);
+        newSet.add(rowKey);
       }
       return newSet;
     });
   };
 
+  const checklistWithKeys = analysis.checklist.map((item, index) => ({
+    item,
+    rowKey: `${index}-${item.ruleName}-${item.status}`,
+  }));
+
   // Sort: Missing first, then Unclear, then Present, then N/A
-  const sortedChecklist = [...analysis.checklist].sort((a, b) => {
+  const sortedChecklist = [...checklistWithKeys].sort((a, b) => {
     const order = { 
       [ComplianceStatus.MISSING]: 1, 
       [ComplianceStatus.UNCLEAR]: 2, 
       [ComplianceStatus.PRESENT]: 3, 
       [ComplianceStatus.NOT_APPLICABLE]: 4 
     };
-    return order[a.status] - order[b.status];
+    return order[a.item.status] - order[b.item.status];
   });
 
   const filteredChecklist = activeFilter === 'ALL' 
     ? sortedChecklist 
-    : sortedChecklist.filter(item => item.status === activeFilter);
+    : sortedChecklist.filter(({ item }) => item.status === activeFilter);
 
   const passedCount = analysis.checklist.filter(
     i => i.status === ComplianceStatus.PRESENT
@@ -152,13 +157,13 @@ export default function Checklist({ analysis }: ChecklistProps) {
       <div className="divide-y divide-border">
         <StaggerContainer staggerDelay={0.05}>
           <AnimatePresence mode="popLayout">
-            {filteredChecklist.map((item) => {
+            {filteredChecklist.map(({ item, rowKey }) => {
               const config = StatusConfig[item.status];
               const Icon = config.icon;
-              const isExpanded = expandedItems.has(item.id);
+              const isExpanded = expandedItems.has(rowKey);
 
               return (
-                <StaggerItem key={item.id}>
+                <StaggerItem key={rowKey}>
                   <motion.div
                     layout
                     initial={{ opacity: 0 }}
@@ -200,7 +205,7 @@ export default function Checklist({ analysis }: ChecklistProps) {
                                 <motion.button
                                   whileHover={{ scale: 1.1 }}
                                   whileTap={{ scale: 0.9 }}
-                                  onClick={() => toggleExpand(item.id)}
+                                  onClick={() => toggleExpand(rowKey)}
                                   className="p-1.5 rounded-lg hover:bg-muted transition-colors"
                                   aria-label={isExpanded ? 'Collapse details' : 'Expand details'}
                                 >

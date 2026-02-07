@@ -10,7 +10,17 @@ export const analyzeDocuments = async (files: { base64: string, type: string }[]
   });
 
   if (!response.ok) {
-    throw new Error("Failed to analyze documents");
+    const payload = await response
+      .json()
+      .catch(() => null) as { error?: string } | null;
+
+    const apiMessage = payload?.error;
+    const fallbackMessage = `Failed to analyze documents (${response.status})`;
+    throw new Error(
+      typeof apiMessage === "string" && apiMessage.length > 0
+        ? apiMessage
+        : fallbackMessage,
+    );
   }
 
   return response.json();
