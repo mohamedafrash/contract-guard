@@ -29,6 +29,13 @@ export interface AnalysisResult {
   missingItemsEmailDraft: string;
 }
 
+export interface AnalysisHistoryItem {
+  id: string;
+  createdAt: number;
+  fileNames: string[];
+  result: AnalysisResult;
+}
+
 export interface UploadedFile {
   name: string;
   type: string;

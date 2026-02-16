@@ -4,7 +4,7 @@ A simple tool to review residential real estate contracts. Upload executed PDFs,
 
 ## How it works
 
-Built with **Next.js 16** and **Tailwind 4**. For AI, it uses the **Vercel AI SDK** with **OpenAI GPT‑5 Nano** through the **Vercel AI Gateway**. Authentication is handled by **Clerk**.
+Built with **Next.js 16** and **Tailwind 4**. For AI, it uses the **Vercel AI SDK** with **OpenAI GPT‑5 Nano** through the **Vercel AI Gateway**. Authentication is handled by **Clerk**, and analysis history is stored in **Convex**.
 
 It’s multimodal, so the model reads your PDF pages to find signatures, dates, addenda, and disclosures.
 
@@ -29,6 +29,10 @@ It’s multimodal, so the model reads your PDF pages to find signatures, dates, 
    # optional (defaults to Vercel AI Gateway)
    AI_GATEWAY_BASE_URL=https://ai-gateway.vercel.sh/v1
 
+   # Convex (https://dashboard.convex.dev)
+   NEXT_PUBLIC_CONVEX_URL=https://your-project-name.convex.cloud
+   CONVEX_ADMIN_KEY=your_convex_admin_key_here
+
    # Clerk Authentication (https://dashboard.clerk.com)
    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
    CLERK_SECRET_KEY=sk_test_...
@@ -36,7 +40,12 @@ It’s multimodal, so the model reads your PDF pages to find signatures, dates, 
    NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
    ```
 
-3. **Run**
+3. **Start Convex**
+   ```bash
+   pnpm convex dev
+   ```
+
+4. **Run**
    ```bash
    pnpm dev
    ```
@@ -49,6 +58,7 @@ It’s multimodal, so the model reads your PDF pages to find signatures, dates, 
 - **Compliance Checklist:** Present/Missing/Unclear/Not Applicable.
 - **Email Draft:** Only missing or unclear items.
 - **Copy to Clipboard:** One-click ready to send.
+- **Review History:** Each user can open their previous generated analyses.
 
 Feel free to fork it, tweak the checklist in `app/api/analyze/route.ts`, or use it as a starting point for your own AI workflows.
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FileText,
@@ -14,6 +14,7 @@ import FileUpload from "./components/FileUpload";
 import TransactionCard from "./components/TransactionCard";
 import Checklist from "./components/Checklist";
 import EmailDraft from "./components/EmailDraft";
+import HistoryPanel from "./components/HistoryPanel";
 import { ThemeToggle } from "./components/ThemeToggle";
 import {
   FadeIn,
@@ -21,14 +22,42 @@ import {
   StaggerItem,
   HoverScale,
 } from "./components/animations";
-import { UploadedFile, AnalysisResult } from "./types";
-import { analyzeDocuments } from "./services/analysisService";
+import {
+  UploadedFile,
+  AnalysisResult,
+  AnalysisHistoryItem,
+} from "./types";
+import { analyzeDocuments, fetchHistory } from "./services/analysisService";
 
 export default function Home() {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [history, setHistory] = useState<AnalysisHistoryItem[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+
+  const loadHistory = useCallback(async () => {
+    try {
+      setIsLoadingHistory(true);
+      setHistoryError(null);
+      const historyItems = await fetchHistory();
+      setHistory(historyItems);
+    } catch (historyLoadError) {
+      setHistoryError(
+        historyLoadError instanceof Error
+          ? historyLoadError.message
+          : "Failed to load history",
+      );
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadHistory();
+  }, [loadHistory]);
 
   const handleFilesSelected = (newFiles: UploadedFile[]) => {
     setFiles((prev) => [...prev, ...newFiles]);
@@ -50,9 +79,14 @@ export default function Home() {
     setError(null);
 
     try {
-      const payload = files.map((f) => ({ base64: f.base64, type: f.type }));
+      const payload = files.map((f) => ({
+        base64: f.base64,
+        type: f.type,
+        name: f.name,
+      }));
       const analysisData = await analyzeDocuments(payload);
       setResult(analysisData);
+      await loadHistory();
     } catch (err) {
       console.error(err);
       setError(
@@ -68,6 +102,19 @@ export default function Home() {
   const resetApp = () => {
     setFiles([]);
     setResult(null);
+    setError(null);
+  };
+
+  const openHistoryItem = (item: AnalysisHistoryItem) => {
+    setResult(item.result);
+    setFiles(
+      item.fileNames.map((name) => ({
+        name,
+        type: "application/pdf",
+        size: 0,
+        base64: "",
+      })),
+    );
     setError(null);
   };
 
@@ -245,6 +292,15 @@ export default function Home() {
                   )}
                 </AnimatePresence>
               </StaggerContainer>
+
+              <FadeIn delay={0.25}>
+                <HistoryPanel
+                  items={history}
+                  isLoading={isLoadingHistory}
+                  error={historyError}
+                  onOpen={openHistoryItem}
+                />
+              </FadeIn>
 
               {/* Error Message */}
               <AnimatePresence>

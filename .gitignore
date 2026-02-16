@@ -16,6 +16,7 @@ dist-ssr
 .next/
 out/
 next-env.d.ts
+convex/_generated/
 
 # Editor directories and files
 .vscode/*

@@ -1,6 +1,8 @@
-import { AnalysisResult } from "../types";
+import { AnalysisHistoryItem, AnalysisResult } from "../types";
 
-export const analyzeDocuments = async (files: { base64: string, type: string }[]): Promise<AnalysisResult> => {
+export const analyzeDocuments = async (
+  files: { base64: string; type: string; name?: string }[],
+): Promise<AnalysisResult> => {
   const response = await fetch("/api/analyze", {
     method: "POST",
     headers: {
@@ -24,4 +26,23 @@ export const analyzeDocuments = async (files: { base64: string, type: string }[]
   }
 
   return response.json();
+};
+
+export const fetchHistory = async (): Promise<AnalysisHistoryItem[]> => {
+  const response = await fetch("/api/history", {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const payload = await response
+      .json()
+      .catch(() => null) as { error?: string } | null;
+    throw new Error(payload?.error || `Failed to fetch history (${response.status})`);
+  }
+
+  const payload = await response.json() as { history: AnalysisHistoryItem[] };
+  return payload.history;
 };

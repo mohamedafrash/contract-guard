@@ -3,6 +3,8 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { z } from "zod";
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
+import { saveAnalysisToHistory } from "@/app/lib/convexHistory";
+import type { AnalysisResult } from "@/app/types";
 
 const openai = createOpenAI({
   apiKey: process.env.AI_GATEWAY_API_KEY || process.env.OPENAI_API_KEY,
@@ -20,6 +22,7 @@ const requestSchema = z.object({
       z.object({
         base64: z.string(),
         type: z.string(),
+        name: z.string().optional(),
       }),
     )
     .max(MAX_FILES, `A maximum of ${MAX_FILES} files is allowed`)
@@ -206,6 +209,16 @@ export async function POST(request: NextRequest) {
         { error: "Failed to parse AI response" },
         { status: 500 },
       );
+    }
+
+    try {
+      await saveAnalysisToHistory({
+        userId,
+        fileNames: files.map((file) => file.name || "Uploaded document"),
+        analysis: result.output as AnalysisResult,
+      });
+    } catch (historyError) {
+      console.error("Failed to persist analysis history:", historyError);
     }
 
     return NextResponse.json(result.output);
